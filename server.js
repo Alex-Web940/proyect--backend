@@ -2,20 +2,21 @@ import express from "express";
 import * as dotenv from "dotenv";
 import cors from "cors";
 import morgan from "morgan";
-import path from "path";
-import fs from "fs";
 import { fileURLToPath } from "url";
+import path from "path";
 
 import dbConnection from "./database.js";
 import { validateJWT } from "./middlewares/validateJWT.js";
 import { routerUsuario } from "./routes/usuarios.routes.js";
 import { routerCurso } from "./routes/cursos.routes.js";
 import { routerAprendiz } from "./routes/aprendices.routes.js";
+import { routerInstructor } from "./routes/instructores.routes.js";
 
 dotenv.config();
 
-// En modulos ES no existe __dirname; se reconstruye a partir de import.meta.url.
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+// __dirname equivalente en ESM (para poder servir archivos estaticos).
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 /**
  * Representa el servidor de la aplicacion.
@@ -28,9 +29,6 @@ class Server {
   constructor() {
     this.app = express();
     this.port = process.env.PORT || 4500;
-    // Carpeta con el frontend ya compilado. El build del frontend se copia aqui
-    // (ver "npm run deploy:backend" en el frontend) y este mismo servidor lo sirve.
-    this.publicPath = path.join(__dirname, "public");
     this.middlewares();
     this.routes();
     this.conexionBd();
@@ -42,14 +40,12 @@ class Server {
   middlewares() {
     this.app.use(express.json()); // permite leer req.body en formato JSON
     this.app.use(express.urlencoded({ extended: true }));
-    this.app.use(cors()); // permite que el frontend (otro puerto) consuma la API
+    this.app.use(cors()); // permite que el frontend (otro origen/puerto) consuma la API
     this.app.use(morgan("dev")); // muestra en consola cada peticion que llega
 
-    // Sirve el frontend ya compilado (index.html, /assets, favicon...). Si aun
-    // no has copiado el build, la carpeta "public" no existe y esto simplemente
-    // no sirve nada; util en desarrollo, cuando el frontend corre aparte con
-    // "npm run dev" en el puerto 5173.
-    this.app.use(express.static(this.publicPath));
+    // Sirve los archivos estaticos del frontend compilado (carpeta public/).
+    // En desarrollo, si la carpeta no existe, simplemente no sirve nada.
+    this.app.use(express.static(path.join(__dirname, "public")));
   }
 
   /**
@@ -67,6 +63,7 @@ class Server {
     // Privado: requieren token.
     this.app.use("/api/cursos", validateJWT, routerCurso);
     this.app.use("/api/aprendices", validateJWT, routerAprendiz);
+    this.app.use("/api/instructores", validateJWT, routerInstructor);
 
     // Ruta de cortesia para comprobar rapido que el servidor responde.
     // El nombre "/life" es un identificador y no se traduce; el mensaje si.
@@ -74,23 +71,14 @@ class Server {
       res.send("El servidor esta funcionando");
     });
 
-    // Una ruta de API (/api/...) que no coincide con las de arriba cae aqui y
-    // responde 404 en JSON. Este msg lo muestra el frontend tal cual en un
-    // Notify, por eso va en español igual que los demas mensajes del backend.
-    this.app.use("/api/*", (req, res) => {
-      res.status(404).json({ msg: "La ruta solicitada no existe" });
-    });
-
-    // Cualquier OTRA ruta devuelve el index.html del frontend, para que se abra
-    // la aplicacion de Vue (asi tambien funciona entrar por una URL directa,
-    // ademas del modo hash que usa el router). Si todavia no se ha copiado el
-    // build, la carpeta public no existe y responde como antes (util en dev).
+    // Fallback SPA: cualquier ruta que no sea /api/* ni un archivo estatico
+    // devuelve el index.html del frontend para que Vue Router controle la vista.
+    // Las rutas /api/* no manejadas responden 404 en JSON (como antes).
     this.app.get("*", (req, res) => {
-      const indexHtml = path.join(this.publicPath, "index.html");
-      if (fs.existsSync(indexHtml)) {
-        return res.sendFile(indexHtml);
+      if (req.path.startsWith("/api/")) {
+        return res.status(404).json({ msg: "La ruta solicitada no existe" });
       }
-      res.status(404).json({ msg: "La ruta solicitada no existe" });
+      res.sendFile(path.join(__dirname, "public", "index.html"));
     });
   }
 

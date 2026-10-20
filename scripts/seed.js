@@ -23,6 +23,7 @@ import bcrypt from "bcryptjs";
 import Curso from "../models/Curso.js";
 import Aprendiz from "../models/Aprendiz.js";
 import Usuario from "../models/Usuario.js";
+import Instructor from "../models/Instructor.js";
 
 dotenv.config();
 
@@ -127,7 +128,8 @@ const seed = async () => {
     console.log("Conectado a la base de datos");
 
     if (RESET) {
-      await Aprendiz.deleteMany({}); // primero aprendices (dependen de curso)
+      await Aprendiz.deleteMany({});    // primero aprendices (dependen de curso)
+      await Instructor.deleteMany({});  // instructores tambien dependen de curso
       await Curso.deleteMany({});
       await Usuario.deleteMany({});
       console.log("Datos anteriores eliminados (--reset)");
@@ -141,6 +143,17 @@ const seed = async () => {
     const aprendices = generarAprendices(cursosCreados);
     const aprendicesCreados = await Aprendiz.insertMany(aprendices);
     console.log(`${aprendicesCreados.length} aprendices insertados`);
+
+    // 3) Instructores de ejemplo, cada uno con una especialidad (curso) real
+    const instructoresData = [
+      { cedula: "1005269874", nombre: "LUIS ALONSO RODRIGUEZ", email: "luis.rodriguez@sena.edu.co" },
+      { cedula: "52261487",  nombre: "MARIA FERNANDA PINTO",  email: "maria.pinto@sena.edu.co" },
+      { cedula: "79632154",  nombre: "CARLOS ANDRES MOSQUERA", email: "carlos.mosquera@sena.edu.co" },
+      { cedula: "39021587",  nombre: "JORGE DAVID CASTILLO",   email: "jorge.castillo@sena.edu.co" },
+    ].map((ins) => ({ ...ins, especialidad: alAzar(cursosCreados)._id }));
+
+    const instructoresCreados = await Instructor.insertMany(instructoresData);
+    console.log(`${instructoresCreados.length} instructores insertados`);
 
     // 3) Usuario administrador (con la contraseña hasheada, igual que lo haria
     //    el controlador de registro).
