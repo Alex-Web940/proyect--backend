@@ -17,7 +17,7 @@ export default defineConfig({
   // se quedan en Vite y responden 404.
   server: {
     proxy: {
-      '/api': 'http://localhost:4900'
+      '/api': 'http://localhost:4500'
     }
   }
 })

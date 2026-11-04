@@ -69,6 +69,14 @@
           />
           <QuickActionCard
             v-if="sesionStore.esAdmin"
+            icono="manage_accounts"
+            titulo="Usuarios"
+            descripcion="Gestionar cuentas y roles"
+            :to="{ name: 'usuarios' }"
+            color="info"
+          />
+          <QuickActionCard
+            v-if="sesionStore.esAdmin"
             icono="person_add"
             titulo="Registro de usuarios"
             descripcion="Crear cuentas de acceso"

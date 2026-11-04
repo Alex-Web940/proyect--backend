@@ -331,7 +331,7 @@ function cursoDeFila(aprendiz) {
 const columnas = [
   { name: 'documento', label: 'Documento', field: 'documento' },
   { name: 'nombre', label: 'Nombre', field: 'nombre' },
-  { name: 'email', label: 'Email', field: 'email', secundaria: true },
+  { name: 'email', label: 'Email', field: 'email' },
   { name: 'curso', label: 'Curso', field: cursoDeFila },
   { name: 'estado', label: 'Estado', field: (fila) => fila.status }
 ]

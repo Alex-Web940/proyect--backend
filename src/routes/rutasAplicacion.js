@@ -8,6 +8,7 @@ const AdminLayout = () => import('../views/AdminLayout.vue')
 const DashboardView = () => import('../views/DashboardView.vue')
 const CursosView = () => import('../views/CursosView.vue')
 const AprendicesView = () => import('../views/AprendicesView.vue')
+const UsuariosView = () => import('../views/UsuariosView.vue')
 const RegistroView = () => import('../views/RegistroView.vue')
 const AcercaView = () => import('../views/AcercaView.vue')
 const ErrorNoEncontradoView = () => import('../views/ErrorNoEncontradoView.vue')
@@ -41,6 +42,12 @@ const routes = [
         name: 'aprendices',
         component: AprendicesView,
         meta: { titulo: 'Aprendices', menu: { icono: 'groups', descripcion: 'Estudiantes matriculados' } }
+      },
+      {
+        path: 'usuarios',
+        name: 'usuarios',
+        component: UsuariosView,
+        meta: { titulo: 'Usuarios', requiereAdmin: true, menu: { icono: 'manage_accounts', descripcion: 'Cuentas de acceso al sistema' } }
       },
       {
         path: 'registro',

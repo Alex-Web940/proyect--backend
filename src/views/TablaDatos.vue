@@ -1,32 +1,38 @@
 <template>
   <div class="tarjeta tabla-envoltorio aparece">
     <div class="barra">
-      <q-input
-        v-model="busqueda"
-        dense
-        outlined
-        clearable
-        debounce="150"
-        placeholder="Buscar…"
-        aria-label="Buscar en la tabla"
-        class="buscador"
-      >
-        <template v-slot:prepend>
-          <q-icon name="search" />
-        </template>
-      </q-input>
-
-      <div class="herramientas">
-        <q-chip
-          v-if="seleccionadas.length"
+      <div class="buscador-grupo">
+        <q-select
+          v-model="campoBusqueda"
+          :options="opcionesBusqueda"
+          emit-value
+          map-options
+          options-dense
           dense
-          removable
-          color="primary"
-          text-color="dark"
-          :label="`${seleccionadas.length} seleccionado(s)`"
-          @remove="seleccionadas = []"
+          outlined
+          label="Buscar por"
+          class="selector-busqueda"
+          aria-label="Criterio de búsqueda"
         />
 
+        <q-input
+          v-model="busqueda"
+          dense
+          outlined
+          clearable
+          debounce="150"
+          :disable="!campoBusqueda"
+          :placeholder="campoBusqueda ? `Buscar en ${etiquetaBusqueda}…` : 'Elija un criterio'"
+          aria-label="Buscar en la tabla"
+          class="buscador"
+        >
+          <template v-slot:prepend>
+            <q-icon name="search" />
+          </template>
+        </q-input>
+      </div>
+
+      <div class="herramientas">
         <q-btn
           flat
           round
@@ -120,7 +126,6 @@
 
     <q-table
       v-else
-      v-model:selected="seleccionadas"
       v-model:pagination="paginacion"
       flat
       row-key="_id"
@@ -129,7 +134,6 @@
       :columns="columnasTabla"
       :loading="cargando"
       :dense="densidad === 'compacta'"
-      :selection="seleccion ? 'multiple' : 'none'"
       :rows-per-page-options="[10, 25, 50, 0]"
       rows-per-page-label="Filas:"
       no-data-label="Sin datos"
@@ -140,14 +144,6 @@
           :props="props"
           :class="{ 'fila-inactiva': props.row.status === 1 }"
         >
-          <q-td v-if="seleccion" auto-width>
-            <q-checkbox
-              v-model="props.selected"
-              dense
-              :aria-label="`Seleccionar fila ${props.rowIndex + 1}`"
-            />
-          </q-td>
-
           <q-td v-for="col in props.cols" :key="col.name" :props="props">
             <span
               v-if="col.name === 'estado'"
@@ -177,13 +173,12 @@
 </template>
 
 <script setup>
-import { ref, computed, useSlots } from 'vue'
+import { ref, computed, watch, useSlots } from 'vue'
 
 const props = defineProps({
   filas: { type: Array, default: () => [] },
   columnas: { type: Array, required: true },
   cargando: { type: Boolean, default: false },
-  seleccion: { type: Boolean, default: true },
   nombreArchivo: { type: String, default: 'datos' },
   textoVacio: { type: String, default: 'No hay registros para mostrar' }
 })
@@ -192,12 +187,41 @@ const emit = defineEmits(['recargar'])
 const slots = useSlots()
 
 const busqueda = ref('')
-const seleccionadas = ref([])
+// Columna por la que se busca. Es obligatoria: mientras esté vacía el campo
+// de texto queda deshabilitado.
+const campoBusqueda = ref('')
 const densidad = ref('normal')
 const paginacion = ref({ page: 1, rowsPerPage: 10, sortBy: null, descending: false })
 const ocultas = ref([])
 
 const haySlotAcciones = computed(() => !!slots.acciones)
+
+// Opciones del selector: todas las columnas visibles, salvo las marcadas con
+// `noBuscar` (por ejemplo, el rol en Usuarios).
+const opcionesBusqueda = computed(() =>
+  props.columnas
+    .filter((col) => !ocultas.value.includes(col.name) && !col.noBuscar)
+    .map((col) => ({ value: col.name, label: col.label }))
+)
+
+const columnaBusqueda = computed(
+  () => props.columnas.find((col) => col.name === campoBusqueda.value) || null
+)
+
+const etiquetaBusqueda = computed(() => columnaBusqueda.value?.label || '')
+
+// Al cambiar de criterio se descarta el texto anterior para no filtrar con
+// una columna distinta a la que se muestra.
+watch(campoBusqueda, () => {
+  busqueda.value = ''
+})
+
+// Si la columna elegida se oculta desde "Columnas visibles", se limpia.
+watch(ocultas, (lista) => {
+  if (campoBusqueda.value && lista.includes(campoBusqueda.value)) {
+    campoBusqueda.value = ''
+  }
+})
 
 const opcionesDensidad = [
   { label: 'Compacta', value: 'compacta', icon: 'density_small' },
@@ -223,22 +247,21 @@ function valorCelda(col, fila) {
 
 const filasFiltradas = computed(() => {
   const texto = normalizar(busqueda.value.trim())
-  if (!texto) return props.filas
-  return props.filas.filter((fila) =>
-    props.columnas.some((col) => normalizar(valorCelda(col, fila)).includes(texto))
-  )
+  const col = columnaBusqueda.value
+  // Sin criterio (o sin texto) no se filtra: se muestra todo.
+  if (!texto || !col) return props.filas
+  return props.filas.filter((fila) => normalizar(valorCelda(col, fila)).includes(texto))
 })
 
 const columnasTabla = computed(() => {
   const cols = props.columnas
     .filter((col) => !ocultas.value.includes(col.name))
-    .map(({ format, ...resto }) => ({
+    // `noBuscar` solo lo usa el selector; no debe llegar a la tabla.
+    .map(({ format, noBuscar, ...resto }) => ({
       align: 'left',
       sortable: true,
       ...resto,
-      field: (fila) => valorCelda({ ...resto, format }, fila),
-      classes: resto.secundaria ? 'col-secundaria' : '',
-      headerClasses: resto.secundaria ? 'col-secundaria' : ''
+      field: (fila) => valorCelda({ ...resto, format }, fila)
     }))
 
   if (haySlotAcciones.value) {
@@ -294,6 +317,17 @@ function exportarCsv() {
   gap: 10px;
   padding: 14px 16px;
   border-bottom: 1px solid var(--border);
+}
+.tabla-envoltorio .buscador-grupo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.tabla-envoltorio .selector-busqueda {
+  width: 190px;
+  max-width: 100%;
 }
 .tabla-envoltorio .buscador {
   width: 300px;
@@ -369,13 +403,9 @@ function exportarCsv() {
 .tabla-envoltorio .tabla tbody tr:hover td.col-acciones {
   background: var(--bg-elev);
 }
-@media (max-width: 1399px) {
-  .tabla-envoltorio .col-secundaria {
-    display: none;
-  }
-}
 @media (max-width: 599px) {
-  .tabla-envoltorio .buscador {
+  .tabla-envoltorio .buscador,
+  .tabla-envoltorio .selector-busqueda {
     width: 100%;
   }
 }
