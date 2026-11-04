@@ -8,7 +8,7 @@ import { check } from "express-validator";
 import { validateFields } from "../middlewares/validateFields.js";
 import { usuarioHelper } from "../helpers/usuario.helper.js";
 
-const { validateExistEmail } = usuarioHelper;
+const { validateExistEmail, validateExistUsuarioById } = usuarioHelper;
 
 const usuarioVali = {};
 
@@ -49,6 +49,55 @@ usuarioVali.validateLogin = [
     .isEmail()
     .withMessage("El email no es valido"),
   check("password", "La contraseña es obligatoria").notEmpty(),
+  validateFields,
+];
+
+/**
+ * Valida los datos para actualizar un usuario.
+ *
+ * - El email se valida como unico pero excluyendo al propio usuario, para que
+ *   guardar sin cambiar el correo no falle.
+ * - La contraseña es opcional: si no viene, se conserva la actual.
+ */
+usuarioVali.validateUpdateUsuario = [
+  check("id", "El id no es valido")
+    .isMongoId()
+    .bail()
+    .custom(async (id) => {
+      await validateExistUsuarioById(id);
+    }),
+  check("nombre", "El nombre es obligatorio").notEmpty(),
+  check("email", "El email es obligatorio")
+    .notEmpty()
+    .bail()
+    .isEmail()
+    .withMessage("El email no es valido")
+    .bail()
+    .custom(async (email, { req }) => {
+      await validateExistEmail(email, req.params.id);
+    }),
+  check("rol", "El rol es obligatorio")
+    .notEmpty()
+    .bail()
+    .isIn(["ADMIN", "USER"])
+    .withMessage("El rol no es valido"),
+  check("password")
+    .optional({ checkFalsy: true })
+    .isLength({ min: 6 })
+    .withMessage("La contraseña debe tener al menos 6 caracteres"),
+  validateFields,
+];
+
+/**
+ * Valida que el id enviado por la url corresponda a un usuario existente.
+ */
+usuarioVali.validateExistUsuario = [
+  check("id", "El id no es valido")
+    .isMongoId()
+    .bail()
+    .custom(async (id) => {
+      await validateExistUsuarioById(id);
+    }),
   validateFields,
 ];
 

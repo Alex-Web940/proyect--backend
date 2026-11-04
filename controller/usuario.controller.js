@@ -5,6 +5,77 @@ import { generarJWT } from "../helpers/generarJWT.js";
 
 const usuarioCtrl = {};
 
+// Listar usuarios (opcionalmente filtrados por status: /api/usuarios?status=0).
+// El modelo ya elimina el password al serializar con toJSON.
+usuarioCtrl.getUsuarios = async (req, res) => {
+  const { status } = req.query;
+  try {
+    const usuarios = await Usuario.find(status ? { status } : {}).sort({
+      createdAt: -1,
+    });
+    res.json(usuarios);
+  } catch (error) {
+    res.status(400).json({ msg: "No fue posible terminar la operacion" });
+  }
+};
+
+// Obtener un usuario por id.
+usuarioCtrl.getUsuarioId = async (req, res) => {
+  const { id } = req.params;
+  try {
+    const usuario = await Usuario.findById(id);
+    res.json(usuario);
+  } catch (error) {
+    res.status(400).json({ msg: "No fue posible terminar la operacion" });
+  }
+};
+
+// Actualizar un usuario. La contraseña es opcional: si no viene, se conserva
+// la actual; si viene, se vuelve a hashear antes de guardar.
+usuarioCtrl.updateUsuario = async (req, res) => {
+  const { id } = req.params;
+  const { nombre, email, rol, password } = req.body;
+  try {
+    const datos = {
+      nombre: nombre.toUpperCase().trim(),
+      email: email.toLowerCase().trim(),
+      rol,
+    };
+
+    if (password) {
+      const salt = bcrypt.genSaltSync(10);
+      datos.password = bcrypt.hashSync(password, salt);
+    }
+
+    await Usuario.findByIdAndUpdate(id, datos);
+    res.json({ msg: "Usuario actualizado correctamente" });
+  } catch (error) {
+    res.status(400).json({ msg: "No fue posible terminar la operacion" });
+  }
+};
+
+// Activar usuario (status 0). No se borra el registro, solo cambia el estado.
+usuarioCtrl.activeUsuario = async (req, res) => {
+  const { id } = req.params;
+  try {
+    await Usuario.findByIdAndUpdate(id, { status: 0 });
+    res.json({ msg: "Usuario activado correctamente" });
+  } catch (error) {
+    res.status(400).json({ msg: "No fue posible terminar la operacion" });
+  }
+};
+
+// Desactivar usuario (status 1).
+usuarioCtrl.inactiveUsuario = async (req, res) => {
+  const { id } = req.params;
+  try {
+    await Usuario.findByIdAndUpdate(id, { status: 1 });
+    res.json({ msg: "Usuario desactivado correctamente" });
+  } catch (error) {
+    res.status(400).json({ msg: "No fue posible terminar la operacion" });
+  }
+};
+
 /**
  * Registrar un nuevo usuario.
  *

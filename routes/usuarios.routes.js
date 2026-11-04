@@ -3,8 +3,17 @@ import { usuarioCtrl } from "../controller/usuario.controller.js";
 import { usuarioVali } from "../validations/usuario.validation.js";
 import { validateJWT } from "../middlewares/validateJWT.js";
 
-const { validateRegisterUsuario, validateLogin } = usuarioVali;
-const { registerUsuario, loginUsuario } = usuarioCtrl;
+const { validateRegisterUsuario, validateLogin, validateUpdateUsuario, validateExistUsuario } =
+  usuarioVali;
+const {
+  registerUsuario,
+  loginUsuario,
+  getUsuarios,
+  getUsuarioId,
+  updateUsuario,
+  activeUsuario,
+  inactiveUsuario,
+} = usuarioCtrl;
 
 const routerUsuario = Router();
 
@@ -29,5 +38,23 @@ routerUsuario.post(
   validateRegisterUsuario,
   registerUsuario
 );
+
+// Rutas de gestion de usuarios: todas requieren token, igual que cursos y
+// aprendices. El login de arriba es la unica ruta publica.
+
+// GET /api/usuarios            -> lista todos (opcional ?status=0|1)
+routerUsuario.get("/", validateJWT, getUsuarios);
+
+// GET /api/usuarios/:id        -> uno por id
+routerUsuario.get("/:id", validateJWT, validateExistUsuario, getUsuarioId);
+
+// PUT /api/usuarios/update/:id -> actualizar
+routerUsuario.put("/update/:id", validateJWT, validateUpdateUsuario, updateUsuario);
+
+// PUT /api/usuarios/active/:id -> activar
+routerUsuario.put("/active/:id", validateJWT, validateExistUsuario, activeUsuario);
+
+// PUT /api/usuarios/inactive/:id -> desactivar
+routerUsuario.put("/inactive/:id", validateJWT, validateExistUsuario, inactiveUsuario);
 
 export { routerUsuario };
